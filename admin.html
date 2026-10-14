@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
 <title>پنل مدیریت خاطره‌ها</title>
 <style>
 :root{font-family:Tahoma,Arial,sans-serif;color:#4b2638;background:#fff7fa;line-height:1.8}
@@ -20,12 +21,20 @@ button,.button{border:0;border-radius:999px;padding:11px 18px;background:#8d3155
 button.secondary{background:#785866}button.danger{background:#a3293f}
 button:disabled{opacity:.5;cursor:wait}
 #app{display:none}.notice{padding:12px;background:#fff1f5;border-radius:12px;margin:12px 0}
-#message{white-space:pre-wrap}.photo-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+#message{white-space:pre-wrap}.photo-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
 .photo-card{border:1px solid #efd6df;border-radius:14px;padding:10px;overflow:hidden}
 .photo-card img{width:100%;height:130px;object-fit:cover;border-radius:9px}
 .photo-card input{margin-top:6px}
+.photo-card .num{display:block;color:#8d3155;font-weight:bold;margin-bottom:4px}
+.photo-card .row{display:flex;gap:6px;flex-wrap:wrap}
+.photo-card button{padding:7px 12px;margin:6px 0 0;font-size:.85rem}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
-@media(max-width:650px){.grid{grid-template-columns:1fr}body{padding:10px}.panel,header{padding:16px}}
+.datebox{background:#fff7fa;border:1px solid #f0d5e0;border-radius:16px;padding:14px 16px;margin:0 0 16px}
+.datebox h3{margin:0 0 4px;color:#8d3155;font-size:1.05rem}
+.grid3{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:10px}
+.grid3 select{width:100%;padding:11px;border:1px solid #e5c5d2;border-radius:10px;font:inherit;background:#fff}
+#datePreview{margin:8px 0 0}#datePreview.bad{color:#a3293f}
+@media(max-width:650px){.grid3{grid-template-columns:1fr}.grid{grid-template-columns:1fr}body{padding:10px}.panel,header{padding:16px}}
 </style>
 </head>
 <body>
@@ -33,7 +42,11 @@ button:disabled{opacity:.5;cursor:wait}
 <header>
 <h1>🔐 پنل مدیریت خاطره‌ها</h1>
 <p>از اینجا می‌توانی متن‌های صفحه، تاریخ شمارنده و گالری عکس‌ها را تغییر بدهی. تغییرات ذخیره‌شده برای همه بازدیدکنندگان نمایش داده می‌شوند.</p>
-<a class="button" href="index.html">مشاهده صفحه اصلی</a>
+<div class="actions">
+<a class="button" id="homeLink" href="index.html">مشاهده صفحه اصلی</a>
+<a class="button secondary" id="previewLink" href="index.html" target="_blank" rel="noopener" style="display:none;background:#785866">👁 پیش‌نمایش در تب جدید</a>
+<button class="danger" id="exitBtn" type="button" style="display:none">🚪 خروج از پنل</button>
+</div>
 </header>
 
 <section class="panel" id="loginPanel">
@@ -48,17 +61,32 @@ button:disabled{opacity:.5;cursor:wait}
 <section class="panel">
 <h2>متن‌ها و تنظیمات صفحه</h2>
 <p class="hint">برای حفظ خط‌های نامه، متن نامه را با خط جدید وارد کن. پس از ذخیره، صفحه اصلی را تازه‌سازی کن.</p>
+<div class="datebox">
+<h3>📅 تاریخ شروع شمارنده (شمسی)</h3>
+<p class="hint">تاریخ را شمسی وارد کن؛ در پایگاه داده به‌صورت میلادی و امن ذخیره می‌شود و روی صفحه اصلی هم شمسی نشان داده می‌شود.</p>
+<div class="grid3">
+<div><label for="jy">سال</label><input id="jy" type="number" inputmode="numeric" min="1300" max="1700" placeholder="۱۴۰۵"></div>
+<div><label for="jm">ماه</label><select id="jm"></select></div>
+<div><label for="jd">روز</label><input id="jd" type="number" inputmode="numeric" min="1" max="31" placeholder="۷"></div>
+</div>
+<p class="hint" id="datePreview"></p>
+</div>
 <div id="settingsFields" class="grid"></div>
-<div class="actions"><button id="saveSettings">ذخیره تنظیمات</button><button class="secondary" id="logoutBtn">خروج از حساب</button></div>
+<div class="actions"><button id="saveSettings">ذخیره تنظیمات</button></div>
 </section>
 
 <section class="panel">
 <h2>مدیریت عکس‌ها</h2>
+<div class="datebox" id="starterBox" style="display:none">
+<h3>📦 انتقال عکس‌های اولیه به فضای ابری</h3>
+<p class="hint">سه عکس اولیه صفحه (پوشه starter-photos) با یک کلیک به Supabase منتقل می‌شوند تا مثل بقیه عکس‌ها قابل ویرایش، جابجایی، تعویض و حذف باشند. این کار فقط یک‌بار لازم است و باید پوشه starter-photos روی سایت آپلود شده باشد.</p>
+<button id="starterBtn" type="button">انتقال عکس‌های اولیه</button>
+</div>
 <label for="photoFiles">انتخاب یک یا چند عکس</label>
 <input id="photoFiles" type="file" accept="image/*" multiple>
 <label for="newPhotoTitle">عنوان عکس‌های جدید</label>
 <input id="newPhotoTitle" type="text" value="خاطره جدید 🤍" maxlength="120">
-<p class="hint">عکس‌ها در Supabase Storage ذخیره می‌شوند؛ عنوان هر عکس را می‌توانی در فهرست پایین تغییر بدهی.</p>
+<p class="hint">عکس‌های بزرگ قبل از بارگذاری خودکار بهینه می‌شوند (حداکثر ۱۸۰۰ پیکسل) تا روی موبایل سریع باز شوند. ترتیب نمایش در صفحه اصلی همان ترتیب فهرست زیر است.</p>
 <button id="uploadBtn">بارگذاری عکس‌ها</button>
 <div id="photoList" class="photo-list"></div>
 </section>
@@ -67,6 +95,7 @@ button:disabled{opacity:.5;cursor:wait}
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
+<script src="jdate.js"></script>
 <script>
 (() => {
  const cfg=window.SUPABASE_CONFIG||{};
@@ -77,6 +106,9 @@ button:disabled{opacity:.5;cursor:wait}
  const app=document.getElementById("app");
  let sb=null, currentSettings={}, photos=[];
  const fields=[
+  ["gate_title","عنوان صفحه خوش‌آمد (قبل از باز شدن سایت)","text"],
+  ["gate_subtitle","متن زیر عنوان خوش‌آمد","text"],
+  ["gate_button","متن دکمه باز کردن","text"],
   ["hero_eyebrow","عبارت کوچک بالای عنوان","text"],
   ["hero_title","عنوان اصلی","text"],
   ["hero_tagline","زیرعنوان داخل عنوان","text"],
@@ -90,7 +122,6 @@ button:disabled{opacity:.5;cursor:wait}
   ["gallery_subtitle","توضیح گالری عکس","textarea"],
   ["counter_heading","عنوان شمارنده","text"],
   ["counter_subtitle","متن زیر شمارنده","text"],
-  ["start_date","تاریخ شروع شمارنده (YYYY-MM-DD)","text"],
   ["secret_1_title","عنوان راز اول","text"],["secret_1_body","متن راز اول","textarea"],
   ["secret_2_title","عنوان راز دوم","text"],["secret_2_body","متن راز دوم","textarea"],
   ["secret_3_title","عنوان راز سوم","text"],["secret_3_body","متن راز سوم","textarea"],
@@ -100,22 +131,54 @@ button:disabled{opacity:.5;cursor:wait}
   ["footer_text","متن پایین صفحه","text"]
  ];
  const defaults={
+  gate_title:"برای تو، ماجی 🤍",gate_subtitle:"هدیه‌ی روز دختر، از طرف محمد",gate_button:"بازش کن",
   hero_eyebrow:"یک گوشه کوچک از قلب محمد برای تو",hero_title:"ماجی 🤍",
-  hero_tagline:"این صفحه فقط برای تو ساخته شده",hero_lead:"مرسی که درکم میکنی و تنهام نمیزاری.",
+  hero_tagline:"این صفحه فقط برای تو ساخته شده",hero_lead:"مرسی که درکم می‌کنی و تنهام نمی‌ذاری.",
   hero_scroll:"بریم توی خاطره‌هامون ↓",letter_heading:"💌 نامه‌ای برای ماجی",
   letter_subtitle:"چیزهایی که شاید گفتنش با یک صفحه ساده، قشنگ‌تر شود.",
-  letter_body:"ماجی جان،\n\nبعضی آدم‌ها فقط وارد زندگی آدم نمی‌شوند؛\nآرام‌آرام تبدیل می‌شوند به بخشی از دلش.\n\nمی‌خواستم اینجا یک چیز ساده برایت بسازم؛\nجایی که هر وقت دلت خواست، بتوانی برگردی و یادت بیاید\nکه یک نفر هست که حضورت برایش مهم است.\n\nمرسی که درکم میکنی و تنهام نمیزاری.\nمرسی برای تمام لحظه‌هایی که کنارم بودی،\nحتی وقتی فاصله بینمان زیاد بوده.\n\nمحمد 🤍",
+  letter_body:"ماجی جان،\n\nبعضی آدم‌ها فقط وارد زندگی آدم نمی‌شوند؛\nآرام‌آرام تبدیل می‌شوند به بخشی از دلش.\n\nمی‌خواستم اینجا یک چیز ساده برایت بسازم؛\nجایی که هر وقت دلت خواست، بتوانی برگردی و یادت بیاید\nکه یک نفر هست که حضورت برایش مهم است.\n\nمرسی که درکم می‌کنی و تنهام نمی‌ذاری.\nمرسی برای تمام لحظه‌هایی که کنارم بودی،\nحتی وقتی فاصله بینمان زیاد بوده.\n\nمحمد 🤍",
   signature:"همیشه، محمد",gallery_heading:"📸 عکس‌های ما",
-  gallery_subtitle:"خاطره‌های تصویری‌مان؛ عکس‌های تازه از فضای ابری بارگذاری می‌شوند و برای همه نمایش داده می‌شوند.",
+  gallery_subtitle:"خاطره‌هایی که با هم ساخته‌ایم 🤍",
   counter_heading:"⏳ شمارنده خاطره",counter_subtitle:"روز از شروع قصه‌مان 🤍",start_date:"2026-06-28",
-  secret_1_title:"راز اول",secret_1_body:"دیوونه وار عاشقتم و با دنیا عوضت نمیکنم.",
-  secret_2_title:"راز دوم",secret_2_body:"درسته مه خیلی مواقع اذیتت میکنم ولی از اعماق وجودم عاشقتم",
-  secret_3_title:"راز سوم",secret_3_body:"همیشه عاشق صداتم،مخصوصا وقتایی که تو ویسات صدام میزنی یا قربون صدقم میری.",
-  secret_4_title:"راز چهارم",secret_4_body:"عاشق موهاتم و وقتی ویدیو مسیچ بدون روسری میفرستی خیره میشم به موهات.",
-  secret_5_title:"راز پنجم",secret_5_body:"بزرگ ترین ارزوی من اینه که یک روزی دستات رو بگیرم و در اقوش بگیرمت.",
-  ending_heading:"♡ آخر این صفحه، شروع ادامه‌ی ماست",ending_body:"ماجی، ممنون که هستی. از طرف محمد، با تمام قلبم 🤍",
+  secret_1_title:"راز اول",secret_1_body:"دیوونه‌وار عاشقتم و با دنیا عوضت نمی‌کنم.",
+  secret_2_title:"راز دوم",secret_2_body:"درسته من خیلی مواقع اذیتت می‌کنم ولی از اعماق وجودم عاشقتم.",
+  secret_3_title:"راز سوم",secret_3_body:"همیشه عاشق صداتم؛ مخصوصاً وقتایی که تو ویسات صدام می‌زنی یا قربون‌صدقه‌م می‌ری.",
+  secret_4_title:"راز چهارم",secret_4_body:"عاشق موهاتم و وقتی ویدیو مسیج بدون روسری می‌فرستی، خیره می‌شم به موهات.",
+  secret_5_title:"راز پنجم",secret_5_body:"بزرگ‌ترین آرزوی من اینه که یه روزی دستات رو بگیرم و در آغوشت بگیرم.",
+  ending_heading:"♡ آخر این صفحه، شروع ادامه‌ی ماست",ending_body:"ماجی، ممنون که هستی.\nاز طرف محمد، با تمام قلبم 🤍",
   footer_text:"ساخته شده با عشق برای محمد و ماجی 🤍"
  };
+ // متن‌های قدیمیِ پیش‌فرض (با غلط تایپی یا متن فنی)؛ اگر در دیتابیس هنوز همین‌ها بود، با نسخه اصلاح‌شده جایگزین می‌شوند.
+ const legacyDefaults={
+  hero_lead:"مرسی که درکم میکنی و تنهام نمیزاری.",
+  letter_body:"ماجی جان،\n\nبعضی آدم‌ها فقط وارد زندگی آدم نمی‌شوند؛\nآرام‌آرام تبدیل می‌شوند به بخشی از دلش.\n\nمی‌خواستم اینجا یک چیز ساده برایت بسازم؛\nجایی که هر وقت دلت خواست، بتوانی برگردی و یادت بیاید\nکه یک نفر هست که حضورت برایش مهم است.\n\nمرسی که درکم میکنی و تنهام نمیزاری.\nمرسی برای تمام لحظه‌هایی که کنارم بودی،\nحتی وقتی فاصله بینمان زیاد بوده.\n\nمحمد 🤍",
+  gallery_subtitle:"خاطره‌های تصویری‌مان؛ عکس‌های تازه از فضای ابری بارگذاری می‌شوند و برای همه نمایش داده می‌شوند.",
+  secret_1_body:"دیوونه وار عاشقتم و با دنیا عوضت نمیکنم.",
+  secret_2_body:"درسته مه خیلی مواقع اذیتت میکنم ولی از اعماق وجودم عاشقتم",
+  secret_3_body:"همیشه عاشق صداتم،مخصوصا وقتایی که تو ویسات صدام میزنی یا قربون صدقم میری.",
+  secret_4_body:"عاشق موهاتم و وقتی ویدیو مسیچ بدون روسری میفرستی خیره میشم به موهات.",
+  secret_5_body:"بزرگ ترین ارزوی من اینه که یک روزی دستات رو بگیرم و در اقوش بگیرمت.",
+  ending_body:"ماجی، ممنون که هستی. از طرف محمد، با تمام قلبم 🤍"
+ };
+ const JD=window.JDate;
+ const jyEl=document.getElementById("jy"),jmEl=document.getElementById("jm"),jdEl=document.getElementById("jd"),datePreview=document.getElementById("datePreview");
+ JD.monthNames.forEach((n,i)=>{const o=document.createElement("option");o.value=i+1;o.textContent=n;jmEl.appendChild(o);});
+ function readJalali(){return {jy:parseInt(jyEl.value,10),jm:parseInt(jmEl.value,10),jd:parseInt(jdEl.value,10)};}
+ function updateDatePreview(){
+  const {jy,jm,jd}=readJalali();
+  if(!JD.isValidJalali(jy,jm,jd)){datePreview.className="hint bad";datePreview.textContent="تاریخ معتبر نیست (سال ۱۳۰۰ تا ۱۷۰۰، روز مطابق طول ماه).";return null;}
+  const iso=JD.jalaliToIso(jy,jm,jd),[y,m,d]=iso.split("-").map(Number);
+  const days=Math.floor((new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())-new Date(y,m-1,d))/86400000);
+  datePreview.className="hint";
+  datePreview.textContent=`معادل میلادی: ${iso} — ${days>=0?JD.faNum(days)+" روز از این تاریخ گذشته":"این تاریخ در آینده است"}`;
+  return iso;
+ }
+ function fillJalali(iso){
+  const j=JD.isoToJalali(iso);
+  if(!j){jyEl.value="";jdEl.value="";datePreview.textContent="";return;}
+  jyEl.value=j.jy;jmEl.value=j.jm;jdEl.value=j.jd;updateDatePreview();
+ }
+ [jyEl,jmEl,jdEl].forEach(el=>el.addEventListener("input",updateDatePreview));
  function makeFields(){
   const wrap=document.getElementById("settingsFields");
   fields.forEach(([key,label,type])=>{
@@ -131,39 +194,123 @@ button:disabled{opacity:.5;cursor:wait}
   const {data,error}=await sb.from("site_content").select("key,value");
   if(error)throw error;
   currentSettings={...defaults};
-  (data||[]).forEach(r=>currentSettings[r.key]=r.value);
+  (data||[]).forEach(r=>currentSettings[r.key]=(legacyDefaults[r.key]!==undefined&&r.value===legacyDefaults[r.key])?defaults[r.key]:r.value);
   document.querySelectorAll("[data-key]").forEach(el=>el.value=String(currentSettings[el.dataset.key]??""));
+  fillJalali(String(currentSettings.start_date||defaults.start_date));
  }
  async function checkSession(){
   const {data:{session}}=await sb.auth.getSession();
-  if(!session){loginPanel.style.display="block";app.style.display="none";say("برای مدیریت، با حساب مدیر وارد شو.");return;}
+  if(!session){showLogin("برای مدیریت، با حساب مدیر وارد شو.");return;}
   const {data:admin,error}=await sb.from("admin_users").select("user_id").eq("user_id",session.user.id).maybeSingle();
-  if(error||!admin){loginPanel.style.display="block";app.style.display="none";say("این حساب اجازه مدیریت ندارد. شناسه کاربر را در جدول admin_users ثبت کن.");return;}
-  loginPanel.style.display="none";app.style.display="block";
+  if(error||!admin){await sb.auth.signOut({scope:"local"});showLogin("این حساب اجازه مدیریت ندارد. شناسه کاربر را در جدول admin_users ثبت کن.");return;}
+  showApp();
   await loadSettings();await loadPhotos();say("ورود موفق بود؛ تغییرات فقط پس از ذخیره اعمال می‌شوند.");
+ }
+ const extOf=(f)=>(f.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";
+ async function prepareImage(file){
+  const original={body:file,ext:extOf(file),type:file.type};
+  if(!/^image\/(jpeg|png|webp)$/.test(file.type))return original;
+  try{
+   const bmp=await createImageBitmap(file);
+   const scale=Math.min(1,1800/Math.max(bmp.width,bmp.height));
+   if(scale===1&&file.size<1.5*1024*1024){bmp.close&&bmp.close();return original;}
+   const c=document.createElement("canvas");c.width=Math.round(bmp.width*scale);c.height=Math.round(bmp.height*scale);
+   const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(bmp,0,0,c.width,c.height);bmp.close&&bmp.close();
+   const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.86));
+   if(!blob||blob.size>=file.size)return original;
+   return {body:blob,ext:"jpg",type:"image/jpeg"};
+  }catch(e){console.warn("Image optimize skipped:",e);return original;}
+ }
+ const starters=[
+  {path:"starter-1.jpg",file:"starter-photos/starter-1.jpg",title:"اولین عکسمون 🤍"},
+  {path:"starter-2.jpg",file:"starter-photos/starter-2.jpg",title:"یک خاطره شیرین 🤍"},
+  {path:"starter-3.jpg",file:"starter-photos/starter-3.jpg",title:"عکس مورد علاقمون 🤍"}
+ ];
+ const STARTER_FLAG="me-and-you-starter-done";
+ function updateStarterBox(){
+  let done=false;try{done=localStorage.getItem(STARTER_FLAG)==="1";}catch(e){}
+  const have=new Set(photos.map(p=>p.storage_path));
+  const missing=starters.filter(s=>!have.has(s.path));
+  document.getElementById("starterBox").style.display=(!done&&missing.length)?"block":"none";
+ }
+ document.getElementById("starterBtn").onclick=async()=>{
+  const btn=document.getElementById("starterBtn");btn.disabled=true;say("در حال انتقال عکس‌های اولیه…");
+  try{
+   const have=new Set(photos.map(p=>p.storage_path));
+   const missing=starters.filter(s=>!have.has(s.path));
+   const base=photos.length?Math.min(...photos.map(p=>new Date(p.created_at).getTime())):Date.now();
+   for(const [idx,s] of missing.entries()){
+    const res=await fetch(s.file,{cache:"no-store"});
+    if(!res.ok)throw new Error(`فایل ${s.file} پیدا نشد؛ مطمئن شو پوشه starter-photos همراه سایت آپلود شده است.`);
+    const blob=await res.blob();
+    const up=await sb.storage.from("gallery").upload(s.path,blob,{upsert:false,contentType:"image/jpeg"});
+    if(up.error&&!/already exists|duplicate/i.test(up.error.message))throw up.error;
+    const created_at=new Date(base-(starters.length-starters.indexOf(s))*1000).toISOString();
+    const row=await sb.from("gallery_photos").insert({title:s.title,storage_path:s.path,created_at});
+    if(row.error)throw row.error;
+   }
+   try{localStorage.setItem(STARTER_FLAG,"1");}catch(e){}
+   say("عکس‌های اولیه منتقل شدند. حالا می‌توانی آن‌ها را مثل بقیه ویرایش کنی.");await loadPhotos();
+  }catch(e){say("انتقال ناموفق بود: "+e.message);}
+  finally{btn.disabled=false;}
+ };
+ async function swapOrder(a,b){
+  const ta=a.created_at,tb=b.created_at,ida=a.id,idb=b.id;
+  const r1=await sb.from("gallery_photos").update({created_at:tb}).eq("id",ida);
+  if(r1.error)throw r1.error;
+  const r2=await sb.from("gallery_photos").update({created_at:ta}).eq("id",idb);
+  if(r2.error){await sb.from("gallery_photos").update({created_at:ta}).eq("id",ida);throw r2.error;}
  }
  async function loadPhotos(){
   const {data,error}=await sb.from("gallery_photos").select("id,title,storage_path,created_at").order("created_at",{ascending:true});
   if(error)throw error;photos=data||[];
+  updateStarterBox();
   const wrap=document.getElementById("photoList");wrap.innerHTML="";
   if(!photos.length){wrap.textContent="هنوز عکسی در فضای ابری ثبت نشده است.";return;}
-  photos.forEach(row=>{
+  photos.forEach((row,idx)=>{
    const card=document.createElement("div");card.className="photo-card";
+   const num=document.createElement("small");num.className="num";num.textContent="عکس "+JD.faNum(idx+1);
    const img=document.createElement("img");img.loading="lazy";
    img.src=sb.storage.from("gallery").getPublicUrl(row.storage_path).data.publicUrl;
    img.alt=row.title||"عکس";
    const title=document.createElement("input");title.value=row.title||"";title.maxLength=120;title.setAttribute("aria-label","عنوان عکس");
+   const run=async(btns,fn,okText)=>{btns.forEach(b=>b.disabled=true);try{await fn();if(okText)say(okText);await loadPhotos();}catch(e){say("خطا: "+e.message);btns.forEach(b=>b.disabled=false);}};
+   const row1=document.createElement("div");row1.className="row";
+   const row2=document.createElement("div");row2.className="row";
    const save=document.createElement("button");save.textContent="ذخیره عنوان";
-   save.onclick=async()=>{save.disabled=true;const {error}=await sb.from("gallery_photos").update({title:title.value.trim()||"خاطره 🤍"}).eq("id",row.id);save.disabled=false;if(error)say("خطا در ذخیره عنوان: "+error.message);else{say("عنوان عکس ذخیره شد.");await loadPhotos();}};
+   const up=document.createElement("button");up.className="secondary";up.textContent="⬆ جلوتر";up.disabled=idx===0;
+   const down=document.createElement("button");down.className="secondary";down.textContent="⬇ عقب‌تر";down.disabled=idx===photos.length-1;
+   const rep=document.createElement("button");rep.className="secondary";rep.textContent="🔄 تعویض عکس";
    const del=document.createElement("button");del.className="danger";del.textContent="حذف عکس";
-   del.onclick=async()=>{if(!confirm("این عکس برای همه حذف شود؟"))return;del.disabled=true;
-    const rm=await sb.storage.from("gallery").remove([row.storage_path]);
-    if(rm.error){del.disabled=false;say("حذف فایل ناموفق بود: "+rm.error.message);return;}
-    const db=await sb.from("gallery_photos").delete().eq("id",row.id);
-    if(db.error){del.disabled=false;say("فایل حذف شد ولی رکورد پایگاه داده حذف نشد: "+db.error.message);return;}
-    say("عکس حذف شد.");await loadPhotos();
+   const file=document.createElement("input");file.type="file";file.accept="image/*";file.style.display="none";
+   const all=[save,up,down,rep,del];
+   save.onclick=()=>run(all,async()=>{const r=await sb.from("gallery_photos").update({title:title.value.trim()||"خاطره 🤍"}).eq("id",row.id);if(r.error)throw r.error;},"عنوان عکس ذخیره شد.");
+   up.onclick=()=>run(all,()=>swapOrder(row,photos[idx-1]),"ترتیب عکس‌ها تغییر کرد.");
+   down.onclick=()=>run(all,()=>swapOrder(row,photos[idx+1]),"ترتیب عکس‌ها تغییر کرد.");
+   rep.onclick=()=>file.click();
+   file.onchange=()=>{const f=file.files[0];if(!f)return;
+    if(!f.type.startsWith("image/")){say("فقط فایل عکس قابل انتخاب است.");return;}
+    if(f.size>12*1024*1024){say("حجم عکس باید کمتر از ۱۲ مگابایت باشد.");return;}
+    run(all,async()=>{
+     say("در حال تعویض عکس…");
+     const oldPath=row.storage_path,rowId=row.id;
+     const p=await prepareImage(f),path=`${crypto.randomUUID()}.${p.ext}`;
+     const u=await sb.storage.from("gallery").upload(path,p.body,{upsert:false,contentType:p.type});if(u.error)throw u.error;
+     const r=await sb.from("gallery_photos").update({storage_path:path}).eq("id",rowId);
+     if(r.error){await sb.storage.from("gallery").remove([path]);throw r.error;}
+     await sb.storage.from("gallery").remove([oldPath]);
+    },"عکس تعویض شد؛ عنوان و جایگاه قبلی حفظ شد.");
    };
-   card.append(img,title,save,del);wrap.appendChild(card);
+   del.onclick=()=>{if(!confirm("این عکس برای همه حذف شود؟"))return;
+    run(all,async()=>{
+     const rm=await sb.storage.from("gallery").remove([row.storage_path]);
+     if(rm.error)throw new Error("حذف فایل ناموفق بود: "+rm.error.message);
+     const db=await sb.from("gallery_photos").delete().eq("id",row.id);
+     if(db.error)throw new Error("فایل حذف شد ولی رکورد پایگاه داده حذف نشد: "+db.error.message);
+    },"عکس حذف شد.");
+   };
+   row1.append(save,rep);row2.append(up,down,del);
+   card.append(num,img,title,row1,row2,file);wrap.appendChild(card);
   });
  }
  document.getElementById("loginBtn").onclick=async()=>{
@@ -171,10 +318,14 @@ button:disabled{opacity:.5;cursor:wait}
   const email=document.getElementById("email").value.trim(),password=document.getElementById("password").value;
   const {error}=await sb.auth.signInWithPassword({email,password});
   if(error){say("ورود ناموفق بود: "+error.message);return;}
+  document.getElementById("password").value="";
   try{await checkSession()}catch(e){say("خطا: "+e.message);}
  };
  document.getElementById("saveSettings").onclick=async()=>{
+  const iso=updateDatePreview();
+  if(!iso){say("ذخیره انجام نشد: تاریخ شروع شمارنده معتبر نیست.");return;}
   const rows=fields.map(([key])=>({key,value:document.getElementById("f_"+key).value}));
+  rows.push({key:"start_date",value:iso});
   const {error}=await sb.from("site_content").upsert(rows,{onConflict:"key"});
   say(error?"ذخیره تنظیمات ناموفق بود: "+error.message:"تنظیمات ذخیره شد؛ صفحه اصلی را تازه‌سازی کن.");
  };
@@ -187,9 +338,9 @@ button:disabled{opacity:.5;cursor:wait}
    for(const file of files){
     if(!file.type.startsWith("image/"))continue;
     if(file.size>12*1024*1024)throw new Error("حجم هر عکس باید کمتر از ۱۲ مگابایت باشد.");
-    const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";
-    const path=`${crypto.randomUUID()}.${ext}`;
-    const up=await sb.storage.from("gallery").upload(path,file,{upsert:false,contentType:file.type});
+    const p=await prepareImage(file);
+    const path=`${crypto.randomUUID()}.${p.ext}`;
+    const up=await sb.storage.from("gallery").upload(path,p.body,{upsert:false,contentType:p.type});
     if(up.error)throw up.error;
     const row=await sb.from("gallery_photos").insert({title,storage_path:path}).select().single();
     if(row.error){await sb.storage.from("gallery").remove([path]);throw row.error;}
@@ -198,10 +349,45 @@ button:disabled{opacity:.5;cursor:wait}
   }catch(e){say("بارگذاری ناموفق بود: "+e.message);}
   finally{btn.disabled=false;}
  };
- document.getElementById("logoutBtn").onclick=async()=>{await sb.auth.signOut();app.style.display="none";loginPanel.style.display="block";say("از حساب خارج شدی.");};
+ const exitBtn=document.getElementById("exitBtn");
+ function showLogin(text){
+  app.style.display="none";loginPanel.style.display="block";exitBtn.style.display="none";document.getElementById("previewLink").style.display="none";
+  document.getElementById("password").value="";
+  document.getElementById("email").value="";
+  document.getElementById("settingsFields").querySelectorAll("[data-key]").forEach(el=>el.value="");
+  document.getElementById("photoList").innerHTML="";
+  document.getElementById("photoFiles").value="";
+  jyEl.value="";jdEl.value="";datePreview.textContent="";
+  currentSettings={};photos=[];
+  if(text)say(text);
+ }
+ function showApp(){loginPanel.style.display="none";app.style.display="block";exitBtn.style.display="inline-block";document.getElementById("previewLink").style.display="inline-block";}
+ let exiting=false;
+ async function exitPanel(text){
+  exiting=true;
+  try{await sb.auth.signOut({scope:"local"});}catch(e){console.error(e);}
+  showLogin(text||"از پنل خارج شدی. برای ورود دوباره، ایمیل و رمز را وارد کن.");
+  exiting=false;
+ }
+ exitBtn.onclick=()=>exitPanel();
+ document.getElementById("homeLink").addEventListener("click",async(e)=>{
+  e.preventDefault();
+  if(sb)await exitPanel();
+  location.href="index.html";
+ });
+ function wireAuth(){
+  // If the session ends elsewhere (expired token, other tab), lock the panel immediately.
+  sb.auth.onAuthStateChange((event)=>{if(event==="SIGNED_OUT"&&!exiting)showLogin("نشست تو تمام شد؛ دوباره وارد شو.");});
+  // Back/forward cache can restore an old visible panel: re-verify the session.
+  window.addEventListener("pageshow",(e)=>{if(e.persisted)checkSession().catch(()=>showLogin());});
+  // Enter key submits the login form.
+  ["email","password"].forEach(id=>document.getElementById(id).addEventListener("keydown",(e)=>{if(e.key==="Enter")document.getElementById("loginBtn").click();}));
+  // Remove any older long-lived session saved in localStorage by the previous version.
+  try{Object.keys(localStorage).filter(k=>/^sb-.*-auth-token/.test(k)).forEach(k=>localStorage.removeItem(k));}catch(e){}
+ }
  makeFields();
  if(!configured||!window.supabase?.createClient){say("ابتدا فایل supabase-config.js را با آدرس پروژه و کلید عمومی پر کن. سپس مراحل README.txt را انجام بده.");loginPanel.style.display="none";}
- else {sb=window.supabase.createClient(cfg.url,cfg.anonKey);checkSession().catch(e=>say("خطا در بارگذاری پنل: "+e.message));}
+ else {sb=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{storage:window.sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});wireAuth();checkSession().catch(e=>say("خطا در بارگذاری پنل: "+e.message));}
 })();
 </script>
 </body>

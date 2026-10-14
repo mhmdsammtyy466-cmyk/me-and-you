@@ -1,18 +1,28 @@
+/* بارگذاری محتوا و عکس‌ها از Supabase (بدون نیاز به کتابخانه‌ی خارجی).
+ * - ابتدا نسخه‌ی ذخیره‌شده‌ی قبلی نمایش داده می‌شود تا صفحه فوراً کامل دیده شود.
+ * - سپس نسخه‌ی تازه گرفته می‌شود؛ اگر اینترنت ضعیف بود، همان نسخه‌ی قبلی می‌ماند.
+ */
 (() => {
   const cfg = window.SUPABASE_CONFIG || {};
   const configured = cfg.url && cfg.anonKey &&
-    !cfg.url.includes("YOUR_PROJECT_ID") &&
-    !cfg.anonKey.includes("YOUR_SUPABASE");
+    !cfg.url.includes("YOUR_PROJECT_ID") && !cfg.anonKey.includes("YOUR_SUPABASE");
+  const base = (cfg.url || "").replace(/\/$/, "");
+  const CACHE_KEY = "meandyou-cache-v1";
   const statusEl = document.getElementById("cloudStatus");
-  const setStatus = (message) => { if (statusEl) statusEl.textContent = message; };
+  const setStatus = (msg) => { if (statusEl) { statusEl.textContent = msg || ""; statusEl.hidden = !msg; } };
 
-  // Map editable content keys to elements in the original page.
+  // متن فنیِ قدیمیِ زیرعنوان گالری که نباید به مخاطب نشان داده شود.
+  const LEGACY_GALLERY_SUB = "خاطره‌های تصویری‌مان؛ عکس‌های تازه از فضای ابری بارگذاری می‌شوند و برای همه نمایش داده می‌شوند.";
+
   function applyContent(content) {
     const get = (key) => content[key] == null ? null : String(content[key]);
     const setText = (selector, key) => {
       const el = document.querySelector(selector), value = get(key);
       if (el && value !== null) el.textContent = value;
     };
+    setText("#gate .gate-title", "gate_title");
+    setText("#gate .gate-sub", "gate_subtitle");
+    setText("#openGate", "gate_button");
     setText(".hero .eyebrow", "hero_eyebrow");
     const h1 = document.querySelector(".hero h1");
     if (h1 && get("hero_title") !== null) {
@@ -29,22 +39,16 @@
     setText("#letter .letter", "letter_body");
     setText("#letter .signature", "signature");
     const gallery = document.getElementById("photos");
-    if (gallery) {
-      const section = gallery.closest("section");
-      if (section) {
-        const title = section.querySelector(".section-title");
-        const sub = section.querySelector(".section-sub");
-        if (title && get("gallery_heading") !== null) title.textContent = get("gallery_heading");
-        if (sub && get("gallery_subtitle") !== null) sub.textContent = get("gallery_subtitle");
-      }
+    const section = gallery && gallery.closest("section");
+    if (section) {
+      const title = section.querySelector(".section-title"), sub = section.querySelector(".section-sub");
+      if (title && get("gallery_heading") !== null) title.textContent = get("gallery_heading");
+      if (sub && get("gallery_subtitle") !== null && get("gallery_subtitle") !== LEGACY_GALLERY_SUB) sub.textContent = get("gallery_subtitle");
     }
     setText(".counter .section-title", "counter_heading");
     setText(".counter small", "counter_subtitle");
-    const secrets = [...document.querySelectorAll(".secret")];
-    secrets.forEach((card, i) => {
-      const n = i + 1;
-      const title = card.querySelector("b");
-      const body = card.querySelector("p");
+    document.querySelectorAll(".secret").forEach((card, i) => {
+      const n = i + 1, title = card.querySelector("b"), body = card.querySelector("p");
       if (title && get(`secret_${n}_title`) !== null) title.textContent = get(`secret_${n}_title`);
       if (body && get(`secret_${n}_body`) !== null) body.textContent = get(`secret_${n}_body`);
     });
@@ -54,67 +58,83 @@
 
     const startDate = get("start_date");
     if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
-      // Replace only the start date token used by the original counter function.
       window.CLOUD_START_DATE = startDate;
-      const [y, m, d] = startDate.split("-").map(Number);
-      const start = new Date(y, m - 1, d);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const days = Math.max(0, Math.floor((today - start) / 86400000));
-      const num = String(days).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
-      const dayEl = document.getElementById("days");
-      if (dayEl) dayEl.textContent = num;
+      if (typeof window.updateCounter === "function") window.updateCounter();
     }
   }
 
-  function renderGallery(rows, supabase) {
+  const photoUrl = (path) =>
+    `${base}/storage/v1/object/public/gallery/${String(path).split("/").map(encodeURIComponent).join("/")}`;
+
+  function renderGallery(rows) {
     const gallery = document.getElementById("photos");
-    if (!gallery || !Array.isArray(rows) || !rows.length) return;
-    // Keep the original embedded photos and append cloud photos after them.
+    if (!gallery) return;
+    gallery.innerHTML = "";
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "photos-empty";
+      empty.textContent = "به‌زودی عکس‌های ما اینجا میاد 🤍";
+      gallery.appendChild(empty);
+      return;
+    }
     rows.forEach((row) => {
       const box = document.createElement("div");
       box.className = "photo";
       const head = document.createElement("div");
       head.className = "photo-head";
-      const title = document.createElement("span");
-      title.textContent = row.title || "خاطره 🤍";
-      head.appendChild(title);
+      head.textContent = row.title || "خاطره 🤍";
       const img = document.createElement("img");
-      const { data } = supabase.storage.from("gallery").getPublicUrl(row.storage_path);
-      img.src = data.publicUrl;
+      img.src = photoUrl(row.storage_path);
       img.alt = row.title || "عکس خاطره";
       img.loading = "lazy";
-      box.appendChild(head);
-      box.appendChild(img);
+      img.decoding = "async";
+      box.append(head, img);
       gallery.appendChild(box);
     });
   }
 
-  async function start() {
-    if (!configured || !window.supabase?.createClient) {
-      setStatus("برای فعال شدن فضای ابری، آدرس و کلید عمومی Supabase را در supabase-config.js وارد کن.");
-      return;
-    }
-    const supabase = window.supabase.createClient(cfg.url, cfg.anonKey);
-    try {
-      const { data: settings, error: settingsError } = await supabase
-        .from("site_content").select("key,value");
-      if (settingsError) throw settingsError;
-      const content = {};
-      (settings || []).forEach(row => content[row.key] = row.value);
-      applyContent(content);
+  const readCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch (e) { return null; } };
+  const writeCache = (data) => { try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (e) { /* حافظه پر یا غیرفعال */ } };
 
-      const { data: photos, error: photoError } = await supabase
-        .from("gallery_photos").select("id,title,storage_path,created_at")
-        .order("created_at", { ascending: true });
-      if (photoError) throw photoError;
-      if (photos && photos.length) renderGallery(photos, supabase);
-      setStatus(photos && photos.length
-        ? `عکس‌ها از فضای ابری بارگذاری شدند (${photos.length} عکس).`
-        : "اتصال به فضای ابری برقرار است؛ عکس‌های فعلی صفحه نمایش داده می‌شوند تا وقتی عکس‌های ابری اضافه شوند.");
+  async function api(path) {
+    const headers = { apikey: cfg.anonKey };
+    if (/^eyJ/.test(cfg.anonKey)) headers.Authorization = "Bearer " + cfg.anonKey; // کلید قدیمی (JWT)
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12000);
+    try {
+      const res = await fetch(`${base}/rest/v1/${path}`, { headers, signal: ctrl.signal });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return await res.json();
+    } finally { clearTimeout(timer); }
+  }
+
+  async function start() {
+    const friendlyEmpty = () => renderGallery([]);
+    if (!configured) { friendlyEmpty(); return; }
+
+    const cached = readCache();
+    if (cached) {
+      applyContent(cached.content || {});
+      renderGallery(cached.photos || []);
+    }
+
+    try {
+      const [settings, photos] = await Promise.all([
+        api("site_content?select=key,value"),
+        api("gallery_photos?select=id,title,storage_path,created_at&order=created_at.asc")
+      ]);
+      const content = {};
+      (settings || []).forEach((row) => { content[row.key] = row.value; });
+      applyContent(content);
+      renderGallery(photos || []);
+      writeCache({ content, photos: photos || [], at: Date.now() });
+      setStatus("");
     } catch (err) {
-      console.error("Supabase load failed:", err);
-      setStatus("بارگذاری فضای ابری ناموفق بود. تنظیمات Supabase و قوانین دسترسی (RLS) را بررسی کن.");
+      console.error("Load failed:", err);
+      if (!cached) {
+        friendlyEmpty();
+        setStatus("الان نتونستم خاطره‌ها رو بارگذاری کنم؛ اینترنتت رو چک کن و صفحه رو دوباره باز کن 🤍");
+      }
     }
   }
   start();
