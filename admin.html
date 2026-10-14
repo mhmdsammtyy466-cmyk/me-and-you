@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پنل مدیریت خاطره‌ها</title>
+<style>
+:root{font-family:Tahoma,Arial,sans-serif;color:#4b2638;background:#fff7fa;line-height:1.8}
+*{box-sizing:border-box}body{margin:0;padding:20px}
+main{max-width:1000px;margin:auto}
+header,.panel{background:#fff;border:1px solid #f0d5e0;border-radius:22px;padding:22px;margin:0 0 18px;box-shadow:0 8px 28px #7b315014}
+h1,h2{color:#8d3155;margin-top:0}h1{font-size:1.7rem}h2{font-size:1.2rem}
+small,.hint{color:#8c6c79}
+label{display:block;font-weight:bold;margin:12px 0 5px}
+input,textarea{width:100%;padding:11px;border:1px solid #e5c5d2;border-radius:10px;font:inherit;background:#fff}
+textarea{min-height:90px;resize:vertical}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.field{min-width:0}
+button,.button{border:0;border-radius:999px;padding:11px 18px;background:#8d3155;color:#fff;font:inherit;cursor:pointer;text-decoration:none;display:inline-block;margin:8px 4px 0 0}
+button.secondary{background:#785866}button.danger{background:#a3293f}
+button:disabled{opacity:.5;cursor:wait}
+#app{display:none}.notice{padding:12px;background:#fff1f5;border-radius:12px;margin:12px 0}
+#message{white-space:pre-wrap}.photo-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.photo-card{border:1px solid #efd6df;border-radius:14px;padding:10px;overflow:hidden}
+.photo-card img{width:100%;height:130px;object-fit:cover;border-radius:9px}
+.photo-card input{margin-top:6px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:650px){.grid{grid-template-columns:1fr}body{padding:10px}.panel,header{padding:16px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>🔐 پنل مدیریت خاطره‌ها</h1>
+<p>از اینجا می‌توانی متن‌های صفحه، تاریخ شمارنده و گالری عکس‌ها را تغییر بدهی. تغییرات ذخیره‌شده برای همه بازدیدکنندگان نمایش داده می‌شوند.</p>
+<a class="button" href="index.html">مشاهده صفحه اصلی</a>
+</header>
+
+<section class="panel" id="loginPanel">
+<h2>ورود مدیر</h2>
+<p class="hint">حساب مدیر باید از قبل در Supabase ساخته شده باشد و شناسه‌اش در جدول admin_users ثبت شده باشد.</p>
+<label for="email">ایمیل مدیر</label><input id="email" type="email" autocomplete="username" placeholder="admin@example.com">
+<label for="password">رمز عبور</label><input id="password" type="password" autocomplete="current-password">
+<div class="actions"><button id="loginBtn">ورود</button></div>
+</section>
+
+<div id="app">
+<section class="panel">
+<h2>متن‌ها و تنظیمات صفحه</h2>
+<p class="hint">برای حفظ خط‌های نامه، متن نامه را با خط جدید وارد کن. پس از ذخیره، صفحه اصلی را تازه‌سازی کن.</p>
+<div id="settingsFields" class="grid"></div>
+<div class="actions"><button id="saveSettings">ذخیره تنظیمات</button><button class="secondary" id="logoutBtn">خروج از حساب</button></div>
+</section>
+
+<section class="panel">
+<h2>مدیریت عکس‌ها</h2>
+<label for="photoFiles">انتخاب یک یا چند عکس</label>
+<input id="photoFiles" type="file" accept="image/*" multiple>
+<label for="newPhotoTitle">عنوان عکس‌های جدید</label>
+<input id="newPhotoTitle" type="text" value="خاطره جدید 🤍" maxlength="120">
+<p class="hint">عکس‌ها در Supabase Storage ذخیره می‌شوند؛ عنوان هر عکس را می‌توانی در فهرست پایین تغییر بدهی.</p>
+<button id="uploadBtn">بارگذاری عکس‌ها</button>
+<div id="photoList" class="photo-list"></div>
+</section>
+</div>
+<div class="panel notice" id="message" role="status">در حال بررسی تنظیمات…</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script>
+(() => {
+ const cfg=window.SUPABASE_CONFIG||{};
+ const configured=cfg.url&&cfg.anonKey&&!cfg.url.includes("YOUR_PROJECT_ID")&&!cfg.anonKey.includes("YOUR_SUPABASE");
+ const msg=document.getElementById("message");
+ const say=(t)=>msg.textContent=t;
+ const loginPanel=document.getElementById("loginPanel");
+ const app=document.getElementById("app");
+ let sb=null, currentSettings={}, photos=[];
+ const fields=[
+  ["hero_eyebrow","عبارت کوچک بالای عنوان","text"],
+  ["hero_title","عنوان اصلی","text"],
+  ["hero_tagline","زیرعنوان داخل عنوان","text"],
+  ["hero_lead","متن کوتاه زیر عنوان","textarea"],
+  ["hero_scroll","متن لینک رفتن به نامه","text"],
+  ["letter_heading","عنوان بخش نامه","text"],
+  ["letter_subtitle","توضیح زیر عنوان نامه","textarea"],
+  ["letter_body","متن کامل نامه","textarea"],
+  ["signature","امضای نامه","text"],
+  ["gallery_heading","عنوان گالری عکس","text"],
+  ["gallery_subtitle","توضیح گالری عکس","textarea"],
+  ["counter_heading","عنوان شمارنده","text"],
+  ["counter_subtitle","متن زیر شمارنده","text"],
+  ["start_date","تاریخ شروع شمارنده (YYYY-MM-DD)","text"],
+  ["secret_1_title","عنوان راز اول","text"],["secret_1_body","متن راز اول","textarea"],
+  ["secret_2_title","عنوان راز دوم","text"],["secret_2_body","متن راز دوم","textarea"],
+  ["secret_3_title","عنوان راز سوم","text"],["secret_3_body","متن راز سوم","textarea"],
+  ["secret_4_title","عنوان راز چهارم","text"],["secret_4_body","متن راز چهارم","textarea"],
+  ["secret_5_title","عنوان راز پنجم","text"],["secret_5_body","متن راز پنجم","textarea"],
+  ["ending_heading","عنوان پایانی","text"],["ending_body","متن پایانی","textarea"],
+  ["footer_text","متن پایین صفحه","text"]
+ ];
+ const defaults={
+  hero_eyebrow:"یک گوشه کوچک از قلب محمد برای تو",hero_title:"ماجی 🤍",
+  hero_tagline:"این صفحه فقط برای تو ساخته شده",hero_lead:"مرسی که درکم میکنی و تنهام نمیزاری.",
+  hero_scroll:"بریم توی خاطره‌هامون ↓",letter_heading:"💌 نامه‌ای برای ماجی",
+  letter_subtitle:"چیزهایی که شاید گفتنش با یک صفحه ساده، قشنگ‌تر شود.",
+  letter_body:"ماجی جان،\n\nبعضی آدم‌ها فقط وارد زندگی آدم نمی‌شوند؛\nآرام‌آرام تبدیل می‌شوند به بخشی از دلش.\n\nمی‌خواستم اینجا یک چیز ساده برایت بسازم؛\nجایی که هر وقت دلت خواست، بتوانی برگردی و یادت بیاید\nکه یک نفر هست که حضورت برایش مهم است.\n\nمرسی که درکم میکنی و تنهام نمیزاری.\nمرسی برای تمام لحظه‌هایی که کنارم بودی،\nحتی وقتی فاصله بینمان زیاد بوده.\n\nمحمد 🤍",
+  signature:"همیشه، محمد",gallery_heading:"📸 عکس‌های ما",
+  gallery_subtitle:"خاطره‌های تصویری‌مان؛ عکس‌های تازه از فضای ابری بارگذاری می‌شوند و برای همه نمایش داده می‌شوند.",
+  counter_heading:"⏳ شمارنده خاطره",counter_subtitle:"روز از شروع قصه‌مان 🤍",start_date:"2026-06-28",
+  secret_1_title:"راز اول",secret_1_body:"دیوونه وار عاشقتم و با دنیا عوضت نمیکنم.",
+  secret_2_title:"راز دوم",secret_2_body:"درسته مه خیلی مواقع اذیتت میکنم ولی از اعماق وجودم عاشقتم",
+  secret_3_title:"راز سوم",secret_3_body:"همیشه عاشق صداتم،مخصوصا وقتایی که تو ویسات صدام میزنی یا قربون صدقم میری.",
+  secret_4_title:"راز چهارم",secret_4_body:"عاشق موهاتم و وقتی ویدیو مسیچ بدون روسری میفرستی خیره میشم به موهات.",
+  secret_5_title:"راز پنجم",secret_5_body:"بزرگ ترین ارزوی من اینه که یک روزی دستات رو بگیرم و در اقوش بگیرمت.",
+  ending_heading:"♡ آخر این صفحه، شروع ادامه‌ی ماست",ending_body:"ماجی، ممنون که هستی. از طرف محمد، با تمام قلبم 🤍",
+  footer_text:"ساخته شده با عشق برای محمد و ماجی 🤍"
+ };
+ function makeFields(){
+  const wrap=document.getElementById("settingsFields");
+  fields.forEach(([key,label,type])=>{
+   const div=document.createElement("div");div.className="field";
+   const lab=document.createElement("label");lab.htmlFor="f_"+key;lab.textContent=label;
+   const el=document.createElement(type==="textarea"?"textarea":"input");
+   el.id="f_"+key;el.dataset.key=key;
+   if(type!=="textarea")el.type="text";
+   div.append(lab,el);wrap.appendChild(div);
+  });
+ }
+ async function loadSettings(){
+  const {data,error}=await sb.from("site_content").select("key,value");
+  if(error)throw error;
+  currentSettings={...defaults};
+  (data||[]).forEach(r=>currentSettings[r.key]=r.value);
+  document.querySelectorAll("[data-key]").forEach(el=>el.value=String(currentSettings[el.dataset.key]??""));
+ }
+ async function checkSession(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){loginPanel.style.display="block";app.style.display="none";say("برای مدیریت، با حساب مدیر وارد شو.");return;}
+  const {data:admin,error}=await sb.from("admin_users").select("user_id").eq("user_id",session.user.id).maybeSingle();
+  if(error||!admin){loginPanel.style.display="block";app.style.display="none";say("این حساب اجازه مدیریت ندارد. شناسه کاربر را در جدول admin_users ثبت کن.");return;}
+  loginPanel.style.display="none";app.style.display="block";
+  await loadSettings();await loadPhotos();say("ورود موفق بود؛ تغییرات فقط پس از ذخیره اعمال می‌شوند.");
+ }
+ async function loadPhotos(){
+  const {data,error}=await sb.from("gallery_photos").select("id,title,storage_path,created_at").order("created_at",{ascending:true});
+  if(error)throw error;photos=data||[];
+  const wrap=document.getElementById("photoList");wrap.innerHTML="";
+  if(!photos.length){wrap.textContent="هنوز عکسی در فضای ابری ثبت نشده است.";return;}
+  photos.forEach(row=>{
+   const card=document.createElement("div");card.className="photo-card";
+   const img=document.createElement("img");img.loading="lazy";
+   img.src=sb.storage.from("gallery").getPublicUrl(row.storage_path).data.publicUrl;
+   img.alt=row.title||"عکس";
+   const title=document.createElement("input");title.value=row.title||"";title.maxLength=120;title.setAttribute("aria-label","عنوان عکس");
+   const save=document.createElement("button");save.textContent="ذخیره عنوان";
+   save.onclick=async()=>{save.disabled=true;const {error}=await sb.from("gallery_photos").update({title:title.value.trim()||"خاطره 🤍"}).eq("id",row.id);save.disabled=false;if(error)say("خطا در ذخیره عنوان: "+error.message);else{say("عنوان عکس ذخیره شد.");await loadPhotos();}};
+   const del=document.createElement("button");del.className="danger";del.textContent="حذف عکس";
+   del.onclick=async()=>{if(!confirm("این عکس برای همه حذف شود؟"))return;del.disabled=true;
+    const rm=await sb.storage.from("gallery").remove([row.storage_path]);
+    if(rm.error){del.disabled=false;say("حذف فایل ناموفق بود: "+rm.error.message);return;}
+    const db=await sb.from("gallery_photos").delete().eq("id",row.id);
+    if(db.error){del.disabled=false;say("فایل حذف شد ولی رکورد پایگاه داده حذف نشد: "+db.error.message);return;}
+    say("عکس حذف شد.");await loadPhotos();
+   };
+   card.append(img,title,save,del);wrap.appendChild(card);
+  });
+ }
+ document.getElementById("loginBtn").onclick=async()=>{
+  if(!sb)return;say("در حال ورود…");
+  const email=document.getElementById("email").value.trim(),password=document.getElementById("password").value;
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error){say("ورود ناموفق بود: "+error.message);return;}
+  try{await checkSession()}catch(e){say("خطا: "+e.message);}
+ };
+ document.getElementById("saveSettings").onclick=async()=>{
+  const rows=fields.map(([key])=>({key,value:document.getElementById("f_"+key).value}));
+  const {error}=await sb.from("site_content").upsert(rows,{onConflict:"key"});
+  say(error?"ذخیره تنظیمات ناموفق بود: "+error.message:"تنظیمات ذخیره شد؛ صفحه اصلی را تازه‌سازی کن.");
+ };
+ document.getElementById("uploadBtn").onclick=async()=>{
+  const input=document.getElementById("photoFiles"),files=[...input.files];
+  if(!files.length){say("ابتدا یک یا چند عکس انتخاب کن.");return;}
+  const title=document.getElementById("newPhotoTitle").value.trim()||"خاطره جدید 🤍";
+  const btn=document.getElementById("uploadBtn");btn.disabled=true;say("در حال بارگذاری عکس‌ها…");
+  try{
+   for(const file of files){
+    if(!file.type.startsWith("image/"))continue;
+    if(file.size>12*1024*1024)throw new Error("حجم هر عکس باید کمتر از ۱۲ مگابایت باشد.");
+    const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";
+    const path=`${crypto.randomUUID()}.${ext}`;
+    const up=await sb.storage.from("gallery").upload(path,file,{upsert:false,contentType:file.type});
+    if(up.error)throw up.error;
+    const row=await sb.from("gallery_photos").insert({title,storage_path:path}).select().single();
+    if(row.error){await sb.storage.from("gallery").remove([path]);throw row.error;}
+   }
+   input.value="";say("عکس‌ها در فضای ابری ذخیره شدند و برای بازدیدکنندگان نمایش داده می‌شوند.");await loadPhotos();
+  }catch(e){say("بارگذاری ناموفق بود: "+e.message);}
+  finally{btn.disabled=false;}
+ };
+ document.getElementById("logoutBtn").onclick=async()=>{await sb.auth.signOut();app.style.display="none";loginPanel.style.display="block";say("از حساب خارج شدی.");};
+ makeFields();
+ if(!configured||!window.supabase?.createClient){say("ابتدا فایل supabase-config.js را با آدرس پروژه و کلید عمومی پر کن. سپس مراحل README.txt را انجام بده.");loginPanel.style.display="none";}
+ else {sb=window.supabase.createClient(cfg.url,cfg.anonKey);checkSession().catch(e=>say("خطا در بارگذاری پنل: "+e.message));}
+})();
+</script>
+</body>
+</html>
